@@ -1,5 +1,6 @@
 package art.yang.alarm.service.impl;
 
+import art.yang.alarm.config.AlarmConfig;
 import art.yang.alarm.entity.AlarmLog;
 import art.yang.alarm.entity.LBHealthCheck;
 import art.yang.alarm.mapper.AlarmLogMapper;
@@ -22,9 +23,9 @@ import java.util.List;
 @Slf4j
 @Service
 public class AlarmToWxServiceImpl implements AlarmToWxService {
-    private static final int ALARM_THRESHOLD = 3;
-    private static final int ALARM_THRESHOLD_MINUTES = 30;
-    private static final int TIME_WINDOW_MINUTES = 5;
+    /*private static final int ALARM_THRESHOLD = 3;
+    private static final int ALARM_THRESHOLD_TIME = 30;
+    private static final int TIME_WINDOW_TIME = 5;*/
 
     @Resource
     private AlarmLogMapper alarmLogMapper;
@@ -32,6 +33,22 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
     @Resource
     private LBHealthCheckMapper lBHealthCheckMapper;
 
+    /*@Value("${alarm.alarmThreshold}")
+    private int ALARM_THRESHOLD;
+    @Value("${alarm.alarmThresholdTime}")
+    private int ALARM_THRESHOLD_TIME;
+    @Value("${alarm.alarmWindowTime}")
+    private int TIME_WINDOW_TIME;*/
+
+    private final int ALARM_THRESHOLD;
+    private final int ALARM_THRESHOLD_TIME;
+    private final int TIME_WINDOW_TIME;
+
+    public AlarmToWxServiceImpl(AlarmConfig alarmConfig) {
+        this.ALARM_THRESHOLD = alarmConfig.getAlarmThreshold();
+        this.ALARM_THRESHOLD_TIME = alarmConfig.getAlarmThresholdTime();
+        this.TIME_WINDOW_TIME = alarmConfig.getAlarmWindowTime();
+    }
 
     public void processLBHealthCheckAlarm(List<String> LBHealthCheckAlarmList) {
         LocalDateTime now = LocalDateTime.now();
@@ -55,9 +72,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
         }
     }
 
-    /**
-     * 保存负载监控检查数据
-     */
+
     private void saveLBHealthCheck(String pool, String rsIp, String status, LocalDateTime now) {
         LBHealthCheck lbHealthCheck = new LBHealthCheck();
         lbHealthCheck.setPool(pool);
@@ -75,7 +90,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
         queryWrapper.eq("pool", pool)
                 .eq("rs_ip", rsIp)
                 .eq("status", "down")
-                .ge("timestamp", now.minusMinutes(TIME_WINDOW_MINUTES));
+                .ge("timestamp", now.minusMinutes(TIME_WINDOW_TIME));
 
         List<LBHealthCheck> recentAlarms = lBHealthCheckMapper.selectList(queryWrapper);
         if (recentAlarms.size() >= ALARM_THRESHOLD) {
@@ -100,7 +115,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
                 .eq(AlarmLog::getRsIp, rsIp)
                 .eq(AlarmLog::getAlarmMessage, alarmMsg)
                 .eq(AlarmLog::getStatus, "未恢复")
-                .ge(AlarmLog::getTimestamp, now.minusMinutes(ALARM_THRESHOLD_MINUTES));
+                .ge(AlarmLog::getTimestamp, now.minusMinutes(ALARM_THRESHOLD_TIME));
 
         List<AlarmLog> recentAlarms = alarmLogMapper.selectList(queryWrapper);
         if (recentAlarms.isEmpty()) {

@@ -9,10 +9,14 @@ spring:
     password: root
   h2:
     console:
-      path: /h2-console  #h2嵌入式数据库控制台，可以通过浏览器访问
+      path: /h2-console
       enabled: true
 
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-case: true
+alarm:
+  alarmThreshold: 3 #在 alarm-window-time时间内，发生3次进行告警
+  alarmThresholdTime: 30  # 30分钟不能重复告警
+  alarmWindowTime: 5 # 在 5分钟内，发生alarm-threshold次进行告警
