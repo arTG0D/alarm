@@ -20,6 +20,7 @@ import java.io.File;
 @Slf4j
 @AutoConfigureAfter(DataSource.class)
 public class H2DataSourceConfig {
+
     private static final String schema="classpath:db/schema-h2.sql";
 
     @Autowired
@@ -30,8 +31,9 @@ public class H2DataSourceConfig {
 
     @PostConstruct
     public  void init() throws Exception {
-        String userHome= System.getProperty("user.home");
-        File f = new File(userHome+ File.separator+"my.lock");
+        //String userHome= System.getProperty("user.home");
+        String jarPath = getClass().getProtectionDomain().getCodeSource().getLocation().getPath();
+        File f = new File(jarPath+ File.separator+"h2db.lock");
         if(!f.exists()){
             log.info("--------------初始化h2数据----------------------");
             f.createNewFile();
