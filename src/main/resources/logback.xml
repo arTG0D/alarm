@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 定义日志文件的存储位置和文件名 -->
+    <property name="LOG_HOME" value="logs" />
+    <property name="LOG_FILE" value="${LOG_HOME}/alarm.log" />
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%ex{full}" />
+
+    <!-- 控制台输出日志配置 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- 设置日志格式 -->
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 文件输出日志配置，日志轮转 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 文件路径 -->
+        <file>${LOG_FILE}</file>
+        <!-- 定义日志文件如何轮转 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 日志文件的保留周期，按天滚动 -->
+            <fileNamePattern>${LOG_HOME}/alarm-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 最大历史文件数，超过30天的日志文件将被删除 -->
+            <maxHistory>14</maxHistory>
+            <!-- 文件大小限制 -->
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 指定全局的日志级别 -->
+    <root level="DEBUG">
+        <!-- 将日志输出到控制台和文件 -->
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="FILE" />
+    </root>
+
+    <!-- 对不同包的日志进行单独配置 -->
+    <logger name="org.springframework" level="WARN" />
+    <logger name="com.example" level="DEBUG" />
+
+</configuration>
