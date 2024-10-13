@@ -23,6 +23,7 @@ import java.util.List;
 @Service
 public class AlarmToWxServiceImpl implements AlarmToWxService {
     private static final int ALARM_THRESHOLD = 3;
+    private static final int ALARM_THRESHOLD_MINUTES = 30;
     private static final int TIME_WINDOW_MINUTES = 5;
 
     @Resource
@@ -48,7 +49,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
             } else if ("up".equals(status)) {
                 boolean alarmStatus = checkAlarmStatus(pool, rsIp);
                 if (alarmStatus) {
-                    processRecoveryAlert(pool, rsIp);
+                    processRecoveryAlert(pool, rsIp,now);
                 }
             }
         }
@@ -78,17 +79,51 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
 
         List<LBHealthCheck> recentAlarms = lBHealthCheckMapper.selectList(queryWrapper);
         if (recentAlarms.size() >= ALARM_THRESHOLD) {
-            AlarmLog alarmLog = new AlarmLog();
-            alarmLog.setPool(pool);
-            alarmLog.setRsIp(rsIp);
-            alarmLog.setStatus("未恢复");
-            alarmLog.setAlarmMessage(generateAlertMessage(pool,rsIp));
-            alarmLog.setTimestamp(now);
-            alarmLogMapper.insert(alarmLog);
+            String alarmMsg = generateAlarmMessage(pool, rsIp);
+            if (checkRepeatAlarm(pool,rsIp,now, alarmMsg)){
+                AlarmLog alarmLog = new AlarmLog();
+                alarmLog.setPool(pool);
+                alarmLog.setRsIp(rsIp);
+                alarmLog.setStatus("未恢复");
+                alarmLog.setAlarmMessage(alarmMsg);
+                alarmLog.setTimestamp(now);
+                alarmLogMapper.insert(alarmLog);
 
-            sendAlarm(alarmLog);
+                sendAlarm(alarmLog);
+            }
         }
     }
+
+    private boolean checkRepeatAlarm(String pool,String rsIp,LocalDateTime now,String alarmMsg) {
+        LambdaQueryWrapper<AlarmLog> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AlarmLog::getPool, pool)
+                .eq(AlarmLog::getRsIp, rsIp)
+                .eq(AlarmLog::getAlarmMessage, alarmMsg)
+                .eq(AlarmLog::getStatus, "未恢复")
+                .ge(AlarmLog::getTimestamp, now.minusMinutes(ALARM_THRESHOLD_MINUTES));
+
+        List<AlarmLog> recentAlarms = alarmLogMapper.selectList(queryWrapper);
+        if (recentAlarms.isEmpty()) {
+            return true;
+        }
+
+        for (AlarmLog alarm : recentAlarms) {
+            LambdaQueryWrapper<AlarmLog> recoveryWrapper = new LambdaQueryWrapper<>();
+            recoveryWrapper.eq(AlarmLog::getPool, pool)
+                    .eq(AlarmLog::getRsIp, rsIp)
+                    .eq(AlarmLog::getStatus, "已恢复")
+                    .ge(AlarmLog::getTimestamp, alarm.getTimestamp()); // 恢复告警必须晚于告警
+
+            Long recoveryCount = alarmLogMapper.selectCount(recoveryWrapper);
+
+            if (recoveryCount == 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 
     private boolean checkAlarmStatus(String pool, String rsIp){
         LambdaQueryWrapper<AlarmLog> alarmLogLambdaQueryWrapper = new LambdaQueryWrapper<>();
@@ -97,20 +132,26 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
                 .orderByDesc(AlarmLog::getTimestamp)
                 .last("LIMIT 1");
         List<AlarmLog> alarmLogs = alarmLogMapper.selectList(alarmLogLambdaQueryWrapper);
-        if (alarmLogs.get(0).getStatus().equals("down")){
-            return true;
+        if (!alarmLogs.isEmpty()) {
+            return alarmLogs.get(0).getStatus().equals("未恢复");
         }
         return false;
     }
 
-    private void processRecoveryAlert(String pool, String rsIp) {
-        // 发送恢复告警
+    private void processRecoveryAlert(String pool, String rsIp,LocalDateTime now) {
         String recoveryMessage = String.format("恢复告警: Pool：%s Member：%s 状态为 up", pool, rsIp);
         log.info(recoveryMessage);
+        AlarmLog alarmLog = new AlarmLog();
+        alarmLog.setPool(pool);
+        alarmLog.setRsIp(rsIp);
+        alarmLog.setStatus("已恢复");
+        alarmLog.setAlarmMessage(recoveryMessage);
+        alarmLog.setTimestamp(now);
+        alarmLogMapper.insert(alarmLog);
         // TODO:发送告警
     }
 
-    private String generateAlertMessage(String pool, String rsIp) {
+    private String generateAlarmMessage(String pool, String rsIp) {
         return String.format("告警: Pool：%s Member：%s 状态为 down", pool, rsIp);
     }
 
