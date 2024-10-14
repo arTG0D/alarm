@@ -2,6 +2,7 @@ package art.yang.alarm.controller;
 
 import art.yang.alarm.service.AlarmToWxService;
 import cn.hutool.json.JSONUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 
 /**
  * @Author arTGOD
@@ -17,19 +19,21 @@ import java.util.Arrays;
  * @Description
  */
 @RestController
-@RequestMapping("/es-alert")
+@RequestMapping("/lb-alert")
+@Slf4j
 public class alarmController {
     @Resource
     private AlarmToWxService alarmToWxService;
 
     @PostMapping
     public void receiveAlert(@RequestBody String reqBody) {
-        ArrayList<String> LBHealthCheckAlarmList = new ArrayList<>();
-        if (reqBody != null) {
-            String alarmData = JSONUtil.parseObj(reqBody).getStr("body");
-            String[] alarms = alarmData.split("\n");
-            LBHealthCheckAlarmList.addAll(Arrays.asList(alarms));
-        }
+        log.info("reqBody:{}", reqBody);
+
+        LinkedList<String> LBHealthCheckAlarmList = new LinkedList<>();
+        String[] alarms = reqBody.split("\n");
+        LBHealthCheckAlarmList.addAll(Arrays.asList(alarms));
+
+
         alarmToWxService.processLBHealthCheckAlarm(LBHealthCheckAlarmList);
     }
 }

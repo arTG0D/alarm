@@ -3,18 +3,22 @@ server:
 
 spring:
   datasource:
-    url: jdbc:h2:~/alarm-db
+#    url: jdbc:h2:~/alarm-db
+    url: jdbc:h2:file:./db/alarm-db # 持久化
     driver-class-name: org.h2.Driver
     username: root
-    password: root
+    password: SybH2@2024
   h2:
     console:
       path: /h2-console
       enabled: true
+      settings:
+        web-allow-others: true
 
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+#   log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开启 sql 打印
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     map-underscore-to-case: true
 
 alarm:

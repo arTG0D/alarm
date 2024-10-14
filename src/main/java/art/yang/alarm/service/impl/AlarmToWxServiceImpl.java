@@ -117,7 +117,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
                 alarmLog.setTimestamp(now);
                 alarmLogMapper.insert(alarmLog);
                 MarkdownMessage markdownMessage = new MarkdownMessage();
-                markdownMessage.add(MarkdownMessage.getColorText("warning","紧急","[","]业务负载告警"));
+                markdownMessage.add(MarkdownMessage.getColorText("warning","紧急","[","] "+ MarkdownMessage.getBoldText("业务负载告警")));
                 markdownMessage.add(MarkdownMessage.getReferenceText("Pool: " + pool));
                 markdownMessage.add(MarkdownMessage.getReferenceText("rs_ip: " + rsIp));
                 markdownMessage.add(MarkdownMessage.getReferenceText("status: down"));
@@ -180,7 +180,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
         alarmLog.setTimestamp(now);
         alarmLogMapper.insert(alarmLog);
         MarkdownMessage markdownMessage = new MarkdownMessage();
-        markdownMessage.add(MarkdownMessage.getColorText("info","已恢复","[","]业务负载告警"));
+        markdownMessage.add(MarkdownMessage.getColorText("info","已恢复","[","] " + MarkdownMessage.getBoldText("业务负载告警")));
         markdownMessage.add(MarkdownMessage.getReferenceText("Pool: " + pool));
         markdownMessage.add(MarkdownMessage.getReferenceText("rs_ip: " + rsIp));
         markdownMessage.add(MarkdownMessage.getReferenceText("status: up"));

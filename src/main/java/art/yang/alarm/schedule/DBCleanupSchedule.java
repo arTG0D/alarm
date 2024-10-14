@@ -33,7 +33,7 @@ public class DBCleanupSchedule {
 
     private final int alarmLogRetentionDays;
     private final int lbCheckRetentionDays;
-    private  DBCleanupSchedule(AlarmConfig alarmConfig){
+    public  DBCleanupSchedule(AlarmConfig alarmConfig){
         this.alarmLogRetentionDays = alarmConfig.getAlarmLogRetentionDays();
         this.lbCheckRetentionDays = alarmConfig.getLbCheckRetentionDays();
     }

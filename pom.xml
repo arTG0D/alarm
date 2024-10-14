@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>art.yang</groupId>
     <artifactId>alarm</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
     <name>alarm</name>
     <description>alarm</description>
     <properties>
@@ -86,7 +86,7 @@
                 <version>${spring-boot.version}</version>
                 <configuration>
                     <mainClass>art.yang.alarm.AlarmApplication</mainClass>
-                    <skip>true</skip>
+                    <!--<skip>true</skip>-->
                 </configuration>
                 <executions>
                     <execution>
