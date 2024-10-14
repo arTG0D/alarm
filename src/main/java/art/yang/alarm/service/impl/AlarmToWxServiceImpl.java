@@ -5,6 +5,7 @@ import art.yang.alarm.entity.AlarmLog;
 import art.yang.alarm.entity.LBHealthCheck;
 import art.yang.alarm.mapper.AlarmLogMapper;
 import art.yang.alarm.mapper.LBHealthCheckMapper;
+import art.yang.alarm.message.TextMessage;
 import art.yang.alarm.service.AlarmToWxService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -13,7 +14,10 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * @Author arTGOD
@@ -33,21 +37,19 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
     @Resource
     private LBHealthCheckMapper lBHealthCheckMapper;
 
-    /*@Value("${alarm.alarmThreshold}")
-    private int ALARM_THRESHOLD;
-    @Value("${alarm.alarmThresholdTime}")
-    private int ALARM_THRESHOLD_TIME;
-    @Value("${alarm.alarmWindowTime}")
-    private int TIME_WINDOW_TIME;*/
+    @Resource
+    private WxWorkBotService wxWorkBotService;
 
     private final int ALARM_THRESHOLD;
     private final int ALARM_THRESHOLD_TIME;
-    private final int TIME_WINDOW_TIME;
+    private final int ALARM_WINDOW_TIME;
+    private final String webhook;
 
     public AlarmToWxServiceImpl(AlarmConfig alarmConfig) {
         this.ALARM_THRESHOLD = alarmConfig.getAlarmThreshold();
         this.ALARM_THRESHOLD_TIME = alarmConfig.getAlarmThresholdTime();
-        this.TIME_WINDOW_TIME = alarmConfig.getAlarmWindowTime();
+        this.ALARM_WINDOW_TIME = alarmConfig.getAlarmWindowTime();
+        this.webhook = alarmConfig.getWebhook();
     }
 
     public void processLBHealthCheckAlarm(List<String> LBHealthCheckAlarmList) {
@@ -55,9 +57,9 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
 
         for (String lbHealthCheckAlarm : LBHealthCheckAlarmList) {
             String[] alarmParts = lbHealthCheckAlarm.split("&");
-            String pool = alarmParts[0].split(":")[1];
-            String rsIp = alarmParts[1].split(":")[1];
-            String status = alarmParts[2].split(":")[1];
+            String pool = alarmParts[0].split("=")[1];
+            String rsIp = alarmParts[1].split("=")[1];
+            String status = alarmParts[2].split("=")[1];
 
             saveLBHealthCheck(pool, rsIp, status, now);
 
@@ -66,7 +68,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
             } else if ("up".equals(status)) {
                 boolean alarmStatus = checkAlarmStatus(pool, rsIp);
                 if (alarmStatus) {
-                    processRecoveryAlert(pool, rsIp,now);
+                    processRecoveryAlert(pool, rsIp, now);
                 }
             }
         }
@@ -83,19 +85,26 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
     }
 
     /**
-     * 处理 down 状态的告警
+     * 处理 down 状态的告警,告警抑制
      */
     private void processDownAlarm(String pool, String rsIp, LocalDateTime now) {
         QueryWrapper<LBHealthCheck> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("pool", pool)
                 .eq("rs_ip", rsIp)
-                .eq("status", "down")
-                .ge("timestamp", now.minusMinutes(TIME_WINDOW_TIME));
-
+                .ge("timestamp", now.minusMinutes(ALARM_WINDOW_TIME));
         List<LBHealthCheck> recentAlarms = lBHealthCheckMapper.selectList(queryWrapper);
-        if (recentAlarms.size() >= ALARM_THRESHOLD) {
-            String alarmMsg = generateAlarmMessage(pool, rsIp);
-            if (checkRepeatAlarm(pool,rsIp,now, alarmMsg)){
+        List<LBHealthCheck> sortedAlarms = recentAlarms.stream()
+                .sorted(Comparator.comparing(LBHealthCheck::getTimestamp).reversed())
+                .collect(Collectors.toList());
+
+        int upIndex = IntStream.range(0, sortedAlarms.size())
+                .filter(i -> "up".equals(sortedAlarms.get(i).getStatus()))
+                .findFirst()
+                .orElse(-1);
+
+        if (upIndex >= ALARM_THRESHOLD) {
+            String alarmMsg = String.format("告警: Pool：%s rs_ip：%s 状态为 down", pool, rsIp);
+            if (!checkRepeatAlarm(pool, rsIp, now, alarmMsg)) {
                 AlarmLog alarmLog = new AlarmLog();
                 alarmLog.setPool(pool);
                 alarmLog.setRsIp(rsIp);
@@ -103,13 +112,13 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
                 alarmLog.setAlarmMessage(alarmMsg);
                 alarmLog.setTimestamp(now);
                 alarmLogMapper.insert(alarmLog);
-
-                sendAlarm(alarmLog);
+                TextMessage message = new TextMessage(alarmMsg);
+                wxWorkBotService.send(message, webhook);
             }
         }
     }
 
-    private boolean checkRepeatAlarm(String pool,String rsIp,LocalDateTime now,String alarmMsg) {
+    private boolean checkRepeatAlarm(String pool, String rsIp, LocalDateTime now, String alarmMsg) {
         LambdaQueryWrapper<AlarmLog> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(AlarmLog::getPool, pool)
                 .eq(AlarmLog::getRsIp, rsIp)
@@ -119,7 +128,7 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
 
         List<AlarmLog> recentAlarms = alarmLogMapper.selectList(queryWrapper);
         if (recentAlarms.isEmpty()) {
-            return true;
+            return false;
         }
 
         for (AlarmLog alarm : recentAlarms) {
@@ -132,18 +141,17 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
             Long recoveryCount = alarmLogMapper.selectCount(recoveryWrapper);
 
             if (recoveryCount == 0) {
-                return false;
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
-
-    private boolean checkAlarmStatus(String pool, String rsIp){
+    private boolean checkAlarmStatus(String pool, String rsIp) {
         LambdaQueryWrapper<AlarmLog> alarmLogLambdaQueryWrapper = new LambdaQueryWrapper<>();
-        alarmLogLambdaQueryWrapper.eq(AlarmLog::getPool,pool)
-                .eq(AlarmLog::getRsIp,rsIp)
+        alarmLogLambdaQueryWrapper.eq(AlarmLog::getPool, pool)
+                .eq(AlarmLog::getRsIp, rsIp)
                 .orderByDesc(AlarmLog::getTimestamp)
                 .last("LIMIT 1");
         List<AlarmLog> alarmLogs = alarmLogMapper.selectList(alarmLogLambdaQueryWrapper);
@@ -153,8 +161,8 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
         return false;
     }
 
-    private void processRecoveryAlert(String pool, String rsIp,LocalDateTime now) {
-        String recoveryMessage = String.format("恢复告警: Pool：%s Member：%s 状态为 up", pool, rsIp);
+    private void processRecoveryAlert(String pool, String rsIp, LocalDateTime now) {
+        String recoveryMessage = String.format("(已恢复)告警: Pool：%s rs_ip：%s 状态为 up", pool, rsIp);
         log.info(recoveryMessage);
         AlarmLog alarmLog = new AlarmLog();
         alarmLog.setPool(pool);
@@ -163,16 +171,8 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
         alarmLog.setAlarmMessage(recoveryMessage);
         alarmLog.setTimestamp(now);
         alarmLogMapper.insert(alarmLog);
-        // TODO:发送告警
+        TextMessage message = new TextMessage(recoveryMessage);
+        wxWorkBotService.send(message, webhook);
     }
 
-    private String generateAlarmMessage(String pool, String rsIp) {
-        return String.format("告警: Pool：%s Member：%s 状态为 down", pool, rsIp);
-    }
-
-
-    private void sendAlarm(AlarmLog alarmLog) {
-        log.info("发送告警: " + alarmLog.getAlarmMessage());
-        // TODO:发送告警
-    }
 }

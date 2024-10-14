@@ -12,4 +12,5 @@ public class AlarmConfig {
     private int alarmThreshold;
     private int alarmThresholdTime;
     private int alarmWindowTime;
+    private String webhook;
 }
