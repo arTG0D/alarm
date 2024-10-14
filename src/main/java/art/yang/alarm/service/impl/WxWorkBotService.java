@@ -1,12 +1,9 @@
 package art.yang.alarm.service.impl;
 
-import art.yang.alarm.entity.SendResult;
 import art.yang.alarm.message.Message;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpStatus;
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;

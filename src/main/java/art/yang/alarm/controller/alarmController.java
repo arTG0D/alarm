@@ -1,8 +1,6 @@
 package art.yang.alarm.controller;
 
 import art.yang.alarm.service.AlarmToWxService;
-import cn.hutool.json.JSON;
-import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
