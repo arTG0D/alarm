@@ -5,7 +5,7 @@ import art.yang.alarm.entity.AlarmLog;
 import art.yang.alarm.entity.LBHealthCheck;
 import art.yang.alarm.mapper.AlarmLogMapper;
 import art.yang.alarm.mapper.LBHealthCheckMapper;
-import art.yang.alarm.message.TextMessage;
+import art.yang.alarm.message.MarkdownMessage;
 import art.yang.alarm.service.AlarmToWxService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -97,12 +97,16 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
                 .sorted(Comparator.comparing(LBHealthCheck::getTimestamp).reversed())
                 .collect(Collectors.toList());
 
-        int upIndex = IntStream.range(0, sortedAlarms.size())
+        int downCount = IntStream.range(0, sortedAlarms.size())
                 .filter(i -> "up".equals(sortedAlarms.get(i).getStatus()))
                 .findFirst()
                 .orElse(-1);
 
-        if (upIndex >= ALARM_THRESHOLD) {
+        if (downCount == -1) {
+            downCount = sortedAlarms.size();
+        }
+
+        if (downCount >= ALARM_THRESHOLD) {
             String alarmMsg = String.format("告警: Pool：%s rs_ip：%s 状态为 down", pool, rsIp);
             if (!checkRepeatAlarm(pool, rsIp, now, alarmMsg)) {
                 AlarmLog alarmLog = new AlarmLog();
@@ -112,8 +116,12 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
                 alarmLog.setAlarmMessage(alarmMsg);
                 alarmLog.setTimestamp(now);
                 alarmLogMapper.insert(alarmLog);
-                TextMessage message = new TextMessage(alarmMsg);
-                wxWorkBotService.send(message, webhook);
+                MarkdownMessage markdownMessage = new MarkdownMessage();
+                markdownMessage.add(MarkdownMessage.getColorText("warning","紧急","[","]业务负载告警"));
+                markdownMessage.add(MarkdownMessage.getReferenceText("Pool: " + pool));
+                markdownMessage.add(MarkdownMessage.getReferenceText("rs_ip: " + rsIp));
+                markdownMessage.add(MarkdownMessage.getReferenceText("status: down"));
+                wxWorkBotService.send(markdownMessage, webhook);
             }
         }
     }
@@ -171,8 +179,12 @@ public class AlarmToWxServiceImpl implements AlarmToWxService {
         alarmLog.setAlarmMessage(recoveryMessage);
         alarmLog.setTimestamp(now);
         alarmLogMapper.insert(alarmLog);
-        TextMessage message = new TextMessage(recoveryMessage);
-        wxWorkBotService.send(message, webhook);
+        MarkdownMessage markdownMessage = new MarkdownMessage();
+        markdownMessage.add(MarkdownMessage.getColorText("info","已恢复","[","]业务负载告警"));
+        markdownMessage.add(MarkdownMessage.getReferenceText("Pool: " + pool));
+        markdownMessage.add(MarkdownMessage.getReferenceText("rs_ip: " + rsIp));
+        markdownMessage.add(MarkdownMessage.getReferenceText("status: up"));
+        wxWorkBotService.send(markdownMessage, webhook);
     }
 
 }
