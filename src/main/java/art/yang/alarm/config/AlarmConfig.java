@@ -13,4 +13,6 @@ public class AlarmConfig {
     private int alarmThresholdTime;
     private int alarmWindowTime;
     private String webhook;
+    private int alarmLogRetentionDays;
+    private int lbCheckRetentionDays;
 }

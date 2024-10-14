@@ -22,3 +22,5 @@ alarm:
   alarmThresholdTime: 30  # 30分钟不能重复告警
   alarmWindowTime: 5 # 在 5分钟内，发生alarm-threshold次进行告警
   webhook: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=dd3ca8bf-0761-4652-9b7a-0ecb08830fcf
+  alarmLogRetentionDays: 7
+  lbCheckRetentionDays: 7
